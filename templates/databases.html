@@ -1,0 +1,301 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>元数据管理</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🗄️</text></svg>">
+    <link href="/static/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="/static/css/bootstrap-icons.min.css">
+    <style>
+        .card {
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        .card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 20px rgba(0,0,0,0.1);
+        }
+        .db-icon {
+            font-size: 2rem;
+            padding: 1rem;
+            border-radius: 0.5rem;
+            margin-bottom: 1rem;
+        }
+        .mysql-icon {
+            background-color: #4CAF50;
+            color: white;
+        }
+        .postgresql-icon {
+            background-color: #336791;
+            color: white;
+        }
+        .hive-icon {
+            background-color: #FDE74C;
+            color: #222;
+        }
+        .sqlserver-icon {
+            background-color: #0078D4;
+            color: white;
+        }
+    </style>
+</head>
+<body>
+    <div class="container mt-5">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h1>数据库</h1>
+            <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addDatabaseModal">
+                <i class="bi bi-plus"></i> 增加
+            </button>
+        </div>
+        
+        <div class="row row-cols-1 row-cols-md-2 row-cols-lg-4 g-4">
+            {% for db in databases %}
+            <div class="col">
+                <div class="card">
+                    <div class="card-body">
+                        <!-- 数据库类型图标 -->
+                        {% if db.db_type == 'MySQL' %}
+                        <a href="/database/{{ db.id }}/tables" class="text-decoration-none">
+                            <div class="db-icon mysql-icon text-center" style="cursor: pointer;">
+                                <i class="bi bi-database-fill"></i>
+                            </div>
+                        </a>
+                        {% elif db.db_type == 'PostgreSQL' %}
+                        <a href="/database/{{ db.id }}/tables" class="text-decoration-none">
+                            <div class="db-icon postgresql-icon text-center" style="cursor: pointer;">
+                                <i class="bi bi-database-fill"></i>
+                            </div>
+                        </a>
+                        {% elif db.db_type == 'Hive' %}
+                        <a href="/database/{{ db.id }}/tables" class="text-decoration-none">
+                            <div class="db-icon hive-icon text-center" style="cursor: pointer;">
+                                <i class="bi bi-database-fill"></i>
+                            </div>
+                        </a>
+                        {% elif db.db_type == 'SqlServer' %}
+                        <a href="/database/{{ db.id }}/tables" class="text-decoration-none">
+                            <div class="db-icon sqlserver-icon text-center" style="cursor: pointer;">
+                                <i class="bi bi-database-fill"></i>
+                            </div>
+                        </a>
+                        {% endif %}
+                        
+                        <h5 class="card-title">
+                            <a href="/database/{{ db.id }}/tables" class="text-decoration-none">
+                                {{ db.db_alias }}
+                            </a>
+                        </h5>
+                        <p class="card-text">
+                            <strong>类型：</strong>{{ db.db_type }}<br>
+                            <strong>地址：</strong>{{ db.db_host }}:{{ db.db_port }}<br>
+                            <strong>库名：</strong>{{ db.db_name }}
+                        </p>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    
+    <!-- 新增数据库模态框 -->
+    <div class="modal fade" id="addDatabaseModal" tabindex="-1" aria-labelledby="addDatabaseModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="addDatabaseModalLabel">新增数据库</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <form id="addDatabaseForm" method="POST" action="/databases/add">
+                    <div class="modal-body">
+                        <style>
+                            .edit-label {
+                                width: calc(25% - 70px); /* 再减少30px，总共缩小70px */
+                                min-width: 100px;
+                            }
+                            .edit-input {
+                                width: calc(75% + 70px); /* 对应增加70px */
+                            }
+                        </style>
+                        <div class="row mb-3 align-items-center">
+                            <label for="dbType" class="col-form-label edit-label">数据库类型 <span class="text-danger">*</span></label>
+                            <div class="edit-input">
+                                <select class="form-select" id="dbType" name="db_type" required>
+                                    <option value="">请选择数据库类型</option>
+                                    <option value="MySQL">MySQL</option>
+                                    <option value="PostgreSQL">PostgreSQL</option>
+                                    <option value="Hive">Hive</option>
+                                    <option value="SqlServer">SqlServer</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="row mb-3 align-items-center">
+                            <label for="dbAlias" class="col-form-label edit-label">数据库别名 <span class="text-danger">*</span></label>
+                            <div class="edit-input">
+                                <input type="text" class="form-control" id="dbAlias" name="db_alias" placeholder="请输入中文别名" required>
+                            </div>
+                        </div>
+                        <div class="row mb-3 align-items-center">
+                            <label for="dbHost" class="col-form-label edit-label">地址 <span class="text-danger">*</span></label>
+                            <div class="edit-input">
+                                <div class="input-group">
+                                    <input type="text" class="form-control" id="dbHost" name="db_host" placeholder="请输入IP地址" required>
+                                    <input type="number" class="form-control" id="dbPort" name="db_port" placeholder="端口" min="1" max="65535" required>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="row mb-3 align-items-center">
+                            <label for="dbName" class="col-form-label edit-label">数据库名 <span class="text-danger">*</span></label>
+                            <div class="edit-input">
+                                <input type="text" class="form-control" id="dbName" name="db_name" placeholder="请输入数据库名" required>
+                            </div>
+                        </div>
+                        <div class="row mb-3 align-items-center">
+                            <label for="dbUser" class="col-form-label edit-label">用户名 <span class="text-danger">*</span></label>
+                            <div class="edit-input">
+                                <input type="text" class="form-control" id="dbUser" name="db_user" placeholder="请输入用户名" required>
+                            </div>
+                        </div>
+                        <div class="row mb-3 align-items-center">
+                            <label for="dbPassword" class="col-form-label edit-label">密码 <span class="text-danger">*</span></label>
+                            <div class="edit-input">
+                                <input type="password" class="form-control" id="dbPassword" name="db_password" placeholder="请输入密码" required>
+                            </div>
+                        </div>
+                        <div class="row mb-3 align-items-start">
+                            <label for="dbRemark" class="col-form-label edit-label">备注</label>
+                            <div class="edit-input">
+                                <textarea class="form-control" id="dbRemark" name="remark" rows="3" placeholder="请输入备注信息"></textarea>
+                            </div>
+                        </div>
+                        <!-- 测试连接按钮 -->
+                        <div class="row mb-3">
+                            <div class="edit-label"></div>
+                            <div class="edit-input">
+                                <button type="button" class="btn btn-info" id="addTestConnectionBtn">测试连接</button>
+                            </div>
+                        </div>
+                        <!-- 连接结果显示区域 -->
+                        <div class="row mb-3">
+                            <div class="edit-label"></div>
+                            <div class="edit-input">
+                                <div id="addConnectionResult"></div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">关闭</button>
+                        <button type="submit" class="btn btn-primary">保存</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+    
+    <script src="/static/js/bootstrap.bundle.min.js"></script>
+    <script>
+        // 表单验证
+        document.addEventListener('DOMContentLoaded', function() {
+            // 新增表单验证
+            var addForm = document.getElementById('addDatabaseForm');
+            addForm.addEventListener('submit', function(e) {
+                var isValid = this.checkValidity();
+                if (!isValid) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                }
+                this.classList.add('was-validated');
+            });
+            
+            // 数据库类型切换时自动更新默认端口
+            var dbTypeSelect = document.getElementById('dbType');
+            var dbPortInput = document.getElementById('dbPort');
+            
+            dbTypeSelect.addEventListener('change', function() {
+                var dbType = this.value;
+                var defaultPort = '';
+                
+                // 根据数据库类型设置默认端口
+                switch(dbType) {
+                    case 'MySQL':
+                        defaultPort = '3306';
+                        break;
+                    case 'SqlServer':
+                        defaultPort = '1433';
+                        break;
+                    case 'PostgreSQL':
+                        defaultPort = '5432';
+                        break;
+                    case 'Hive':
+                        // Hive不需要改变端口
+                        break;
+                    default:
+                        defaultPort = '';
+                }
+                
+                // 如果有默认端口，则设置默认端口
+                if (defaultPort) {
+                    dbPortInput.value = defaultPort;
+                }
+            });
+            
+            // 测试连接功能
+            var testBtn = document.getElementById('addTestConnectionBtn');
+            var resultDiv = document.getElementById('addConnectionResult');
+            
+            testBtn.addEventListener('click', function() {
+                // 获取表单数据
+                var dbType = document.getElementById('dbType').value;
+                var dbHost = document.getElementById('dbHost').value;
+                var dbPort = document.getElementById('dbPort').value;
+                var dbName = document.getElementById('dbName').value;
+                var dbUser = document.getElementById('dbUser').value;
+                var dbPassword = document.getElementById('dbPassword').value;
+                
+                // 验证必填字段
+                if (!dbType || !dbHost || !dbPort || !dbName || !dbUser) {
+                    resultDiv.innerHTML = '<div class="alert alert-danger">请填写所有必填字段</div>';
+                    return;
+                }
+                
+                // 显示加载状态
+                resultDiv.innerHTML = '<div class="alert alert-warning">正在测试连接...</div>';
+                
+                // 发送AJAX请求
+                var xhr = new XMLHttpRequest();
+                xhr.open('POST', '/databases/test-connection', true);
+                xhr.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');
+                
+                // 构建请求参数
+                var params = new URLSearchParams();
+                params.append('db_type', dbType);
+                params.append('db_host', dbHost);
+                params.append('db_port', dbPort);
+                params.append('db_name', dbName);
+                params.append('db_user', dbUser);
+                params.append('db_password', dbPassword);
+                
+                xhr.onreadystatechange = function() {
+                    if (xhr.readyState === 4) {
+                        if (xhr.status === 200) {
+                            // 解析响应
+                            var response = JSON.parse(xhr.responseText);
+                            
+                            // 显示结果
+                            if (response.success) {
+                                resultDiv.innerHTML = '<div class="alert alert-success">' + response.message + '</div>';
+                            } else {
+                                resultDiv.innerHTML = '<div class="alert alert-danger">' + response.message + '</div>';
+                            }
+                        } else {
+                            resultDiv.innerHTML = '<div class="alert alert-danger">测试请求失败，请检查网络连接</div>';
+                        }
+                    }
+                };
+                
+                // 发送请求
+                xhr.send(params.toString());
+            });
+        });
+    </script>
+</body>
+</html>

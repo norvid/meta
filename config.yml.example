@@ -1,0 +1,31 @@
+# 应用配置
+app:
+  host: '0.0.0.0'
+  port: 46382
+  debug: true
+
+# 数据库配置
+# 以下是不同数据库类型的配置示例，取消注释并修改对应的值
+
+# SQLite配置（默认）
+database:
+  type: 'sqlite'  # 支持 sqlite, mysql, postgresql 等
+  name: 'meta.db'
+
+# MySQL配置
+# database:
+#   type: 'mysql'
+#   host: 'localhost'
+#   port: 3306
+#   name: 'meta'
+#   user: 'your_username'
+#   password: 'your_password'
+
+# PostgreSQL配置
+# database:
+#   type: 'postgresql'
+#   host: 'localhost'
+#   port: 5432
+#   name: 'meta'
+#   user: 'your_username'
+#   password: 'your_password'

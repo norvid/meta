@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ table.schema_name }}.{{ table.table_name }} - 元数据管理</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🗄️</text></svg>">
+    <link href="/static/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="/static/css/bootstrap-icons.min.css">
+    <style>
+        .db-icon {
+            font-size: 1.5rem;
+            padding: 0.5rem;
+            border-radius: 0.3rem;
+            margin-right: 0.5rem;
+        }
+        .mysql-icon {
+            background-color: #4CAF50;
+            color: white;
+        }
+        .postgresql-icon {
+            background-color: #336791;
+            color: white;
+        }
+        .hive-icon {
+            background-color: #FDE74C;
+            color: #222;
+        }
+        .sqlserver-icon {
+            background-color: #0078D4;
+            color: white;
+        }
+        .key-badge {
+            font-size: 0.7rem;
+            padding: 0.2rem 0.4rem;
+            border-radius: 0.3rem;
+        }
+    </style>
+</head>
+<body>
+    <div class="container mt-1">
+        <!-- 面包屑路径 -->
+        <nav aria-label="breadcrumb" class="mb-1">
+            <ol class="breadcrumb">
+                <li class="breadcrumb-item">
+                    <a href="/databases" class="text-decoration-none">数据库</a>
+                </li>
+                <li class="breadcrumb-item">
+                    <a href="/database/{{ database.id }}/tables" class="text-decoration-none">
+                        {{ database.db_name }}
+                    </a>
+                </li>
+                <li class="breadcrumb-item active" aria-current="page">{{ table.table_name }}</li>
+            </ol>
+        </nav>
+        
+        <div class="d-flex justify-content-between align-items-center mb-2">
+            <h1 class="mb-0 mt-0" style="margin: 5px 0;">{{ table.table_name }}</h1>
+            <button type="button" class="btn btn-primary" id="editRemarkBtn">
+                <i class="bi bi-pencil"></i> 编辑
+            </button>
+        </div>
+        
+        <!-- 基本信息 -->
+        <div class="card mb-4">
+            <div class="card-header d-flex justify-content-between align-items-center" id="infoCardHeader" style="cursor: pointer;">
+                <h5 class="card-title mb-0">基本信息</h5>
+                <button type="button" class="btn btn-sm btn-outline-secondary" id="toggleInfoBtn">
+                    <i class="bi bi-chevron-up" id="toggleIcon"></i>
+                </button>
+            </div>
+            <div class="card-body" id="infoBody">
+                <div class="row">
+                    <div class="col-md-6">
+                        <strong>表名：</strong> {{ table.table_name }}
+                    </div>
+                    <div class="col-md-6">
+                        <strong>注释：</strong> {{ table.table_comment or '无' }}
+                    </div>
+                    <div class="col-12 mt-2">
+                        <strong>备注：</strong> <span id="remarkText">{{ table.remark or '无' }}</span>
+                        <!-- 编辑模式下的输入框 -->
+                        <div id="remarkEdit" style="display: none; margin-top: 10px;">
+                            <textarea class="form-control" id="remarkTextarea" rows="3" placeholder="请输入备注信息">{{ table.remark or '' }}</textarea>
+                            <div class="d-flex justify-content-end mt-2">
+                                <button type="button" class="btn btn-sm btn-secondary me-2" id="cancelBtn">取消</button>
+                                <button type="button" class="btn btn-sm btn-primary" id="saveBtn">保存</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- 字段信息 -->
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">字段信息</h5>
+            </div>
+            <div class="card-body">
+                <!-- 筛选框 -->
+                <div class="mb-3">
+                    <input type="text" class="form-control" id="columnFilter" placeholder="输入关键字筛选字段（至少2个字符）">
+                </div>
+                <div class="table-responsive">
+                    <table class="table table-striped table-hover">
+                        <thead class="table-dark">
+                            <tr>
+                                <th style="width: 10%;">序号</th>
+                                <th style="width: 30%;">字段名</th>
+                                <th style="width: 10%;">字段类型</th>
+                                <th style="width: 10%;">KEY</th>
+                                <th style="width: 40%;">备注</th>
+                            </tr>
+                        </thead>
+                        <tbody id="columnsTableBody">
+                            {% for column in columns %}
+                            <tr>
+                                <td>{{ loop.index }}</td>
+                                <td>{{ column.column_name }}</td>
+                                <td>{{ column.column_type }}</td>
+                                <td>
+                                    {% if column.is_primary %}
+                                    <span class="key-badge bg-primary text-white">PK</span>
+                                    {% elif column.is_unique %}
+                                    <span class="key-badge bg-info text-white">UK</span>
+                                    {% else %}
+                                    -{% endif %}
+                                </td>
+                                <td>{{ column.column_comment or '无' }}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <script src="/static/js/bootstrap.bundle.min.js"></script>
+    <script>
+        // 基本信息卡片折叠/展开功能
+        const toggleInfoBtn = document.getElementById('toggleInfoBtn');
+        const infoCardHeader = document.getElementById('infoCardHeader');
+        const infoBody = document.getElementById('infoBody');
+        const toggleIcon = document.getElementById('toggleIcon');
+        
+        // 折叠/展开函数
+        function toggleInfo() {
+            if (infoBody.style.display === 'none') {
+                // 展开
+                infoBody.style.display = 'block';
+                toggleIcon.classList.remove('bi-chevron-down');
+                toggleIcon.classList.add('bi-chevron-up');
+            } else {
+                // 折叠
+                infoBody.style.display = 'none';
+                toggleIcon.classList.remove('bi-chevron-up');
+                toggleIcon.classList.add('bi-chevron-down');
+            }
+        }
+        
+        // 按钮点击事件
+        toggleInfoBtn.addEventListener('click', toggleInfo);
+        
+        // 标题栏双击事件
+        infoCardHeader.addEventListener('dblclick', toggleInfo);
+        
+        // 编辑备注功能
+        const editRemarkBtn = document.getElementById('editRemarkBtn');
+        const remarkText = document.getElementById('remarkText');
+        const remarkEdit = document.getElementById('remarkEdit');
+        const remarkTextarea = document.getElementById('remarkTextarea');
+        const saveBtn = document.getElementById('saveBtn');
+        const cancelBtn = document.getElementById('cancelBtn');
+        
+        // 进入编辑模式
+        editRemarkBtn.addEventListener('click', function() {
+            remarkText.style.display = 'none';
+            remarkEdit.style.display = 'block';
+            editRemarkBtn.disabled = true;
+        });
+        
+        // 保存备注
+        saveBtn.addEventListener('click', function() {
+            const newRemark = remarkTextarea.value;
+            
+            // 发送AJAX请求保存备注
+            var xhr = new XMLHttpRequest();
+            xhr.open('POST', '/database/{{ database.id }}/table/{{ table.id }}/update-remark', true);
+            xhr.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');
+            
+            xhr.onreadystatechange = function() {
+                if (xhr.readyState === 4 && xhr.status === 200) {
+                    // 更新显示
+                    remarkText.textContent = newRemark || '无';
+                    remarkText.style.display = 'inline';
+                    remarkEdit.style.display = 'none';
+                    editRemarkBtn.disabled = false;
+                }
+            };
+            
+            xhr.send('remark=' + encodeURIComponent(newRemark));
+        });
+        
+        // 取消编辑
+        cancelBtn.addEventListener('click', function() {
+            remarkText.style.display = 'inline';
+            remarkEdit.style.display = 'none';
+            editRemarkBtn.disabled = false;
+        });
+        
+        // 字段筛选功能
+        const columnFilter = document.getElementById('columnFilter');
+        const columnsTableBody = document.getElementById('columnsTableBody');
+        const columnRows = columnsTableBody.getElementsByTagName('tr');
+        
+        columnFilter.addEventListener('input', function() {
+            const keyword = this.value.toLowerCase().trim();
+            
+            // 如果关键字长度小于2，显示所有行
+            if (keyword.length < 2) {
+                for (let i = 0; i < columnRows.length; i++) {
+                    columnRows[i].style.display = '';
+                }
+                return;
+            }
+            
+            // 遍历所有行，进行筛选
+            for (let i = 0; i < columnRows.length; i++) {
+                const row = columnRows[i];
+                const cells = row.getElementsByTagName('td');
+                
+                // 字段名在第2个单元格，字段类型在第3个，备注在第5个
+                const columnName = cells[1].textContent.toLowerCase();
+                const columnType = cells[2].textContent.toLowerCase();
+                const columnComment = cells[4].textContent.toLowerCase();
+                
+                // 检查是否包含关键字
+                if (columnName.includes(keyword) || columnType.includes(keyword) || columnComment.includes(keyword)) {
+                    row.style.display = '';
+                } else {
+                    row.style.display = 'none';
+                }
+            }
+        });
+    </script>
+</body>
+</html>

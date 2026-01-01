@@ -1,0 +1,635 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ database.db_alias }} - 元数据管理</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🗄️</text></svg>">
+    <link href="/static/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="/static/css/bootstrap-icons.min.css">
+</head>
+<body>
+    <div class="container mt-1">
+        <!-- 面包屑路径 -->
+        <nav aria-label="breadcrumb" class="mb-1">
+            <ol class="breadcrumb">
+                <li class="breadcrumb-item">
+                    <a href="/databases" class="text-decoration-none">数据库</a>
+                </li>
+                <li class="breadcrumb-item active" aria-current="page">{{ database.db_name }}</li>
+            </ol>
+        </nav>
+        
+        <div class="d-flex justify-content-between align-items-center mb-2">
+            <h1 class="mb-0 mt-0" style="margin: 5px 0;">{{ database.db_alias }}</h1>
+            <div>
+                <button type="button" class="btn btn-primary me-2" data-bs-toggle="modal" data-bs-target="#editDatabaseModal">
+                    <i class="bi bi-pencil"></i> 编辑
+                </button>
+                <button type="button" class="btn btn-danger" data-bs-toggle="modal" data-bs-target="#deleteDatabaseModal">
+                    <i class="bi bi-trash"></i> 删除
+                </button>
+            </div>
+        </div>
+        
+        <!-- 基本信息卡片 -->
+        <div class="card mb-4">
+            <div class="card-header d-flex justify-content-between align-items-center" id="infoCardHeader" style="cursor: pointer;">
+                <h5 class="card-title mb-0">基本信息</h5>
+                <button type="button" class="btn btn-sm btn-outline-secondary" id="toggleInfoBtn">
+                    <i class="bi bi-chevron-up" id="toggleIcon"></i>
+                </button>
+            </div>
+            <div class="card-body" id="infoBody">
+                <div class="row">
+                    <div class="col-md-6">
+                        <strong>类型：</strong>{{ database.db_type }}
+                    </div>
+                    <div class="col-md-6">
+                        <strong>地址：</strong>{{ database.db_host }}:{{ database.db_port }}
+                    </div>
+                    <div class="col-md-6">
+                        <strong>数据库：</strong>{{ database.db_name }}
+                    </div>
+                    <div class="col-md-6">
+                        <strong>别名：</strong>{{ database.db_alias }}
+                    </div>
+                    <div class="col-12 mt-2">
+                        <strong>备注：</strong>{{ database.remark or '无' }}
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 class="card-title mb-0">数据表</h5>
+                <button type="button" class="btn btn-success" id="syncTablesBtn">
+                    <i class="bi bi-arrow-clockwise"></i> 同步
+                </button>
+            </div>
+            <div class="card-body">
+                <!-- 搜索框 -->
+                <div class="mb-4">
+                    <div class="d-flex align-items-center">
+                        <input type="text" class="form-control me-2" placeholder="输入表名、模式或注释关键字" id="searchInput" name="keyword" value="{{ keyword }}" style="width: 50%;">
+                        <button type="button" class="btn btn-primary" id="searchBtn" style="min-width: 100px;">
+                            <i class="bi bi-search"></i> 查询
+                        </button>
+                        <button type="button" class="btn btn-secondary ms-2" id="resetBtn" style="min-width: 100px;">
+                            <i class="bi bi-x-circle"></i> 重置
+                        </button>
+                        <span id="loading" class="ms-2 text-danger" style="display: none;">loading</span>
+                    </div>
+                </div>
+                <div class="table-responsive">
+                    <table class="table table-striped table-hover">
+                        <thead class="table-dark">
+                            <tr>
+                                <th style="width: 20%;">模式</th>
+                                <th style="width: 30%;">表名</th>
+                                <th style="width: 30%;">表注释</th>
+                                <th style="width: 20%;">创建时间</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for table in tables.items %}
+                            <tr>
+                                <td>{{ table.schema_name }}</td>
+                                <td>
+                                    <a href="/database/{{ database.id }}/table/{{ table.schema_name }}/{{ table.table_name }}/info" class="text-decoration-none">
+                                        {{ table.table_name }}
+                                    </a>
+                                </td>
+                                <td>{{ table.table_comment or '无' }}</td>
+                                <td>{{ table.create_time.strftime('%Y-%m-%d %H:%M:%S') if table.create_time else '未知' }}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                
+                <!-- 分页信息和控件 -->
+                <div class="d-flex justify-content-end mt-4">
+                    <div class="me-4 mt-2">
+                        <small id="recordTotal">共 {{ tables.total }} 条记录</small>
+                    </div>
+                    <nav aria-label="Page navigation example">
+                        <ul class="pagination">
+                            {% if tables.has_prev %}
+                            <li class="page-item">
+                                <a class="page-link" href="?page={{ tables.prev_num }}" aria-label="Previous">
+                                    <span aria-hidden="true">&laquo;</span>
+                                </a>
+                            </li>
+                            {% else %}
+                            <li class="page-item disabled">
+                                <a class="page-link" href="#" aria-label="Previous">
+                                    <span aria-hidden="true">&laquo;</span>
+                                </a>
+                            </li>
+                            {% endif %}
+                            
+                            {% for page_num in tables.iter_pages(left_edge=1, right_edge=1, left_current=2, right_current=2) %}
+                                {% if page_num %}
+                                    {% if tables.page == page_num %}
+                                    <li class="page-item active">
+                                        <a class="page-link" href="#">{{ page_num }}</a>
+                                    </li>
+                                    {% else %}
+                                    <li class="page-item">
+                                        <a class="page-link" href="?page={{ page_num }}">{{ page_num }}</a>
+                                    </li>
+                                    {% endif %}
+                                {% else %}
+                                <li class="page-item disabled">
+                                    <a class="page-link" href="#">...</a>
+                                </li>
+                                {% endif %}
+                            {% endfor %}
+                            
+                            {% if tables.has_next %}
+                            <li class="page-item">
+                                <a class="page-link" href="?page={{ tables.next_num }}" aria-label="Next">
+                                    <span aria-hidden="true">&raquo;</span>
+                                </a>
+                            </li>
+                            {% else %}
+                            <li class="page-item disabled">
+                                <a class="page-link" href="#" aria-label="Next">
+                                    <span aria-hidden="true">&raquo;</span>
+                                </a>
+                            </li>
+                            {% endif %}
+                        </ul>
+                    </nav>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- 编辑数据库模态框 -->
+    <div class="modal fade" id="editDatabaseModal" tabindex="-1" aria-labelledby="editDatabaseModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="editDatabaseModalLabel">编辑数据库</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <form id="editDatabaseForm" method="POST" action="/databases/edit">
+                    <input type="hidden" id="editDbId" name="id" value="{{ database.id }}">
+                    <div class="modal-body">
+                        <style>
+                            .edit-label {
+                                width: calc(25% - 70px); /* 再减少30px，总共缩小70px */
+                                min-width: 100px;
+                            }
+                            .edit-input {
+                                width: calc(75% + 70px); /* 对应增加70px */
+                            }
+                        </style>
+                        <div class="row mb-3 align-items-center">
+                            <label for="editDbAlias" class="col-form-label edit-label">数据库别名 <span class="text-danger">*</span></label>
+                            <div class="edit-input">
+                                <input type="text" class="form-control" id="editDbAlias" name="db_alias" placeholder="请输入中文别名" value="{{ database.db_alias }}" required>
+                            </div>
+                        </div>
+                        <div class="row mb-3 align-items-center">
+                            <label for="editDbHost" class="col-form-label edit-label">地址 <span class="text-danger">*</span></label>
+                            <div class="edit-input">
+                                <div class="input-group">
+                                    <input type="text" class="form-control" id="editDbHost" name="db_host" placeholder="请输入IP地址" value="{{ database.db_host }}" required>
+                                    <input type="number" class="form-control" id="editDbPort" name="db_port" placeholder="端口" min="1" max="65535" value="{{ database.db_port }}" required>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="row mb-3 align-items-center">
+                            <label for="editDbName" class="col-form-label edit-label">数据库名 <span class="text-danger">*</span></label>
+                            <div class="edit-input">
+                                <input type="text" class="form-control" id="editDbName" name="db_name" placeholder="请输入数据库名" value="{{ database.db_name }}" required>
+                            </div>
+                        </div>
+                        <div class="row mb-3 align-items-center">
+                            <label for="editDbUser" class="col-form-label edit-label">用户名 <span class="text-danger">*</span></label>
+                            <div class="edit-input">
+                                <input type="text" class="form-control" id="editDbUser" name="db_user" placeholder="请输入用户名" value="{{ database.db_user }}" required>
+                            </div>
+                        </div>
+                        <div class="row mb-3 align-items-center">
+                            <label for="editDbPassword" class="col-form-label edit-label">密码</label>
+                            <div class="edit-input">
+                                <input type="password" class="form-control" id="editDbPassword" name="db_password" placeholder="请输入密码" disabled>
+                            </div>
+                        </div>
+                        <div class="row mb-3">
+                            <div class="edit-label"></div>
+                            <div class="edit-input">
+                                <div class="form-check">
+                                    <input type="checkbox" class="form-check-input" id="updatePassword" name="update_password">
+                                    <label class="form-check-label" for="updatePassword">修改密码</label>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="row mb-3 align-items-start">
+                            <label for="editDbRemark" class="col-form-label edit-label">备注</label>
+                            <div class="edit-input">
+                                <textarea class="form-control" id="editDbRemark" name="remark" rows="3" placeholder="请输入备注信息">{{ database.remark or '' }}</textarea>
+                            </div>
+                        </div>
+                        <!-- 测试连接按钮 -->
+                        <div class="row mb-3">
+                            <div class="edit-label"></div>
+                            <div class="edit-input">
+                                <button type="button" class="btn btn-info" id="testConnectionBtn">测试连接</button>
+                            </div>
+                        </div>
+                        <!-- 连接结果显示区域 -->
+                        <div class="row mb-3">
+                            <div class="edit-label"></div>
+                            <div class="edit-input">
+                                <div id="connectionResult"></div>
+                            </div>
+                        </div>
+                        
+                        <!-- 添加修改密码的JavaScript处理 -->
+                        <script>
+                            // 获取修改密码的checkbox和密码输入框
+                            const updatePasswordCheckbox = document.getElementById('updatePassword');
+                            const passwordInput = document.getElementById('editDbPassword');
+                            
+                            // 监听checkbox的变化事件
+                            updatePasswordCheckbox.addEventListener('change', function() {
+                                if (this.checked) {
+                                    // 如果勾选了修改密码，启用密码输入框
+                                    passwordInput.disabled = false;
+                                    passwordInput.setAttribute('required', 'required');
+                                } else {
+                                    // 如果取消勾选，禁用密码输入框并清空内容
+                                    passwordInput.disabled = true;
+                                    passwordInput.removeAttribute('required');
+                                    passwordInput.value = '';
+                                }
+                            });
+                        </script>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">关闭</button>
+                        <button type="submit" class="btn btn-primary">保存</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+    
+    <!-- 删除数据库模态框 -->
+    <div class="modal fade" id="deleteDatabaseModal" tabindex="-1" aria-labelledby="deleteDatabaseModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="deleteDatabaseModalLabel">确认删除</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <p>确定要删除数据库 <strong>{{ database.db_alias }}</strong> 吗？此操作不可恢复！</p>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                    <form method="POST" action="/databases/delete" style="display: inline;">
+                        <input type="hidden" name="id" value="{{ database.id }}">
+                        <button type="submit" class="btn btn-danger">删除</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <script src="/static/js/bootstrap.bundle.min.js"></script>
+    <script>
+        // 表单验证
+        document.addEventListener('DOMContentLoaded', function() {
+            var editForm = document.getElementById('editDatabaseForm');
+            editForm.addEventListener('submit', function(e) {
+                var isValid = this.checkValidity();
+                if (!isValid) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                }
+                this.classList.add('was-validated');
+            });
+            
+            // 基本信息卡片折叠/展开功能
+            const toggleInfoBtn = document.getElementById('toggleInfoBtn');
+            const infoCardHeader = document.getElementById('infoCardHeader');
+            const infoBody = document.getElementById('infoBody');
+            const toggleIcon = document.getElementById('toggleIcon');
+            
+            // 折叠/展开函数
+            function toggleInfo() {
+                if (infoBody.style.display === 'none') {
+                    // 展开
+                    infoBody.style.display = 'block';
+                    toggleIcon.classList.remove('bi-chevron-down');
+                    toggleIcon.classList.add('bi-chevron-up');
+                } else {
+                    // 折叠
+                    infoBody.style.display = 'none';
+                    toggleIcon.classList.remove('bi-chevron-up');
+                    toggleIcon.classList.add('bi-chevron-down');
+                }
+            }
+            
+            // 按钮点击事件
+            toggleInfoBtn.addEventListener('click', toggleInfo);
+            
+            // 标题栏双击事件
+            infoCardHeader.addEventListener('dblclick', toggleInfo);
+            
+            // AJAX搜索功能
+            const searchInput = document.getElementById('searchInput');
+            const searchBtn = document.getElementById('searchBtn');
+            const resetBtn = document.getElementById('resetBtn');
+            const loading = document.getElementById('loading');
+            const tbody = document.querySelector('.table tbody');
+            
+            function performSearch(keyword) {
+                loading.style.display = 'inline';
+                
+                // 强制收起基本信息卡片
+                infoBody.style.display = 'none';
+                toggleIcon.classList.remove('bi-chevron-up');
+                toggleIcon.classList.add('bi-chevron-down');
+                
+                // 发送AJAX请求
+                var xhr = new XMLHttpRequest();
+                xhr.open('GET', `/database/{{ database.id }}/tables?keyword=${encodeURIComponent(keyword)}&page=1`, true);
+                
+                xhr.onreadystatechange = function() {
+                    if (xhr.readyState === 4) {
+                        // 无论成功还是失败，都隐藏loading
+                        loading.style.display = 'none';
+                        
+                        if (xhr.status === 200) {
+                            // 解析HTML响应
+                            const parser = new DOMParser();
+                            const doc = parser.parseFromString(xhr.responseText, 'text/html');
+                            
+                            // 更新表格内容
+                            const newTbody = doc.querySelector('.table tbody');
+                            tbody.innerHTML = newTbody.innerHTML;
+                            
+                            // 更新分页信息
+                            const newPagination = doc.querySelector('.pagination');
+                            const oldPagination = document.querySelector('.pagination');
+                            oldPagination.innerHTML = newPagination.innerHTML;
+                            
+                            // 更新总数信息
+                            const newTotal = doc.getElementById('recordTotal');
+                            const oldTotal = document.getElementById('recordTotal');
+                            oldTotal.innerHTML = newTotal.innerHTML;
+                        }
+                    }
+                };
+                
+                xhr.send();
+            }
+            
+            // 搜索按钮点击事件
+            searchBtn.addEventListener('click', function() {
+                const keyword = searchInput.value;
+                performSearch(keyword);
+            });
+            
+            // 重置按钮点击事件
+            resetBtn.addEventListener('click', function() {
+                searchInput.value = '';
+                performSearch('');
+            });
+            
+            // 回车键搜索
+            searchInput.addEventListener('keypress', function(e) {
+                if (e.key === 'Enter') {
+                    const keyword = searchInput.value;
+                    performSearch(keyword);
+                }
+            });
+            
+            // 测试连接功能
+            var testBtn = document.getElementById('testConnectionBtn');
+            var resultDiv = document.getElementById('connectionResult');
+            
+            testBtn.addEventListener('click', function() {
+                // 获取表单数据
+                var dbType = '{{ database.db_type }}';
+                var dbHost = document.getElementById('editDbHost').value;
+                var dbPort = document.getElementById('editDbPort').value;
+                var dbName = document.getElementById('editDbName').value;
+                var dbUser = document.getElementById('editDbUser').value;
+                var editDbPassword = document.getElementById('editDbPassword');
+                var dbPassword = editDbPassword.value;
+                
+                // 验证必填字段
+                if (!dbHost || !dbPort || !dbName || !dbUser) {
+                    resultDiv.innerHTML = '<div class="alert alert-danger">请填写所有必填字段</div>';
+                    return;
+                }
+                
+                // 显示加载状态
+                resultDiv.innerHTML = '<div class="alert alert-warning">正在测试连接...</div>';
+                
+                // 发送AJAX请求
+                var xhr = new XMLHttpRequest();
+                xhr.open('POST', '/databases/test-connection', true);
+                xhr.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');
+                
+                // 构建请求参数
+                var params = new URLSearchParams();
+                params.append('id', document.getElementById('editDbId').value);  // 添加数据库ID
+                params.append('db_type', dbType);
+                params.append('db_host', dbHost);
+                params.append('db_port', dbPort);
+                params.append('db_name', dbName);
+                params.append('db_user', dbUser);
+                params.append('db_password', dbPassword);
+                
+                xhr.onreadystatechange = function() {
+                    if (xhr.readyState === 4) {
+                        if (xhr.status === 200) {
+                            // 解析响应
+                            var response = JSON.parse(xhr.responseText);
+                            
+                            // 显示结果
+                            if (response.success) {
+                                resultDiv.innerHTML = '<div class="alert alert-success">' + response.message + '</div>';
+                            } else {
+                                resultDiv.innerHTML = '<div class="alert alert-danger">' + response.message + '</div>';
+                            }
+                        } else {
+                            resultDiv.innerHTML = '<div class="alert alert-danger">测试请求失败，请检查网络连接</div>';
+                        }
+                    }
+                };
+                
+                // 发送请求
+                xhr.send(params.toString());
+            });
+            
+            // 同步表信息功能
+            function syncTables() {
+                // 获取同步按钮
+                const syncBtn = document.getElementById('syncTablesBtn');
+                const originalBtnText = syncBtn.innerHTML;
+                
+                // 显示加载状态并禁用按钮
+                syncBtn.innerHTML = '<i class="bi bi-arrow-clockwise bi-spin"></i> 同步中...';
+                syncBtn.disabled = true;
+                
+                // 发送AJAX请求启动同步
+                var xhr = new XMLHttpRequest();
+                xhr.open('POST', '/database/{{ database.id }}/sync-tables', true);
+                xhr.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');
+                
+                xhr.onreadystatechange = function() {
+                    if (xhr.readyState === 4) {
+                        if (xhr.status === 200) {
+                            // 解析响应
+                            var response = JSON.parse(xhr.responseText);
+                            
+                            if (response.success) {
+                                // 获取token
+                                const token = response.token;
+                                
+                                // 初始化轮询参数
+                                let pollInterval = 3000; // 初始3秒
+                                let pollCount = 0;
+                                const maxFastPolls = 10; // 3秒 * 10 = 30秒
+                                
+                                // 设置轮询
+                                const pollTimer = setInterval(function() {
+                                    checkSyncStatus(token, pollTimer);
+                                    pollCount++;
+                                    
+                                    // 超过30秒后改为10秒轮询
+                                    if (pollCount >= maxFastPolls && pollInterval === 3000) {
+                                        clearInterval(pollTimer);
+                                        pollInterval = 10000; // 改为10秒
+                                        setInterval(function() {
+                                            checkSyncStatus(token, null); // 不再清除定时器，直到任务完成
+                                        }, pollInterval);
+                                    }
+                                }, pollInterval);
+                                
+                                // 立即检查一次状态
+                                checkSyncStatus(token, pollTimer);
+                            } else {
+                                // 恢复按钮状态
+                                syncBtn.innerHTML = originalBtnText;
+                                syncBtn.disabled = false;
+                                
+                                // 显示失败弹窗
+                                showSyncModal(false, response.message);
+                            }
+                        } else {
+                            // 恢复按钮状态
+                            syncBtn.innerHTML = originalBtnText;
+                            syncBtn.disabled = false;
+                            
+                            // 显示网络错误弹窗
+                            showSyncModal(false, '同步请求失败，请检查网络连接');
+                        }
+                    }
+                };
+                
+                // 发送请求
+                xhr.send();
+            }
+            
+            // 检查同步状态
+            function checkSyncStatus(token, pollTimer) {
+                const syncBtn = document.getElementById('syncTablesBtn');
+                
+                var xhr = new XMLHttpRequest();
+                xhr.open('GET', `/database/{{ database.id }}/sync-status?token=${token}`, true);
+                
+                xhr.onreadystatechange = function() {
+                    if (xhr.readyState === 4 && xhr.status === 200) {
+                        // 解析响应
+                        var response = JSON.parse(xhr.responseText);
+                        
+                        if (response.status === 'loading') {
+                            // 继续轮询
+                            console.log('同步中...');
+                        } else if (response.status === 'success' || response.status === 'error') {
+                            // 清除轮询
+                            clearInterval(pollTimer);
+                            
+                            // 恢复按钮状态
+                            syncBtn.innerHTML = '<i class="bi bi-arrow-clockwise"></i> 同步';
+                            syncBtn.disabled = false;
+                            
+                            // 显示结果
+                            showSyncModal(response.status === 'success', response.msg);
+                            
+                            // 如果成功，刷新页面
+                            if (response.status === 'success') {
+                                setTimeout(function() {
+                                    window.location.reload();
+                                }, 2000);
+                            }
+                        }
+                    }
+                };
+                
+                // 发送请求
+                xhr.send();
+            }
+            
+            // 显示同步结果弹窗
+            function showSyncModal(success, message) {
+                // 显示结果弹窗
+                var modal = document.createElement('div');
+                modal.className = 'modal fade show d-block';
+                modal.style.backgroundColor = 'rgba(0,0,0,0.5)';
+                modal.innerHTML = `
+                    <div class="modal-dialog">
+                        <div class="modal-content">
+                            <div class="modal-header">
+                                <h5 class="modal-title">同步结果</h5>
+                                <button type="button" class="btn-close" onclick="this.closest('.modal').remove()"></button>
+                            </div>
+                            <div class="modal-body">
+                                <div class="alert alert-${success ? 'success' : 'danger'} mb-0">
+                                    ${message}
+                                </div>
+                            </div>
+                            <div class="modal-footer">
+                                <button type="button" class="btn btn-primary" onclick="this.closest('.modal').remove()">关闭</button>
+                            </div>
+                        </div>
+                    </div>
+                `;
+                
+                document.body.appendChild(modal);
+                
+                // 添加点击外部关闭事件
+                modal.addEventListener('click', function(e) {
+                    if (e.target === modal) {
+                        modal.remove();
+                    }
+                });
+            }
+            
+            // 关闭同步结果弹窗并刷新页面
+            function closeSyncModal(btn) {
+                const modal = btn.closest('.modal');
+                modal.remove();
+                // 刷新页面
+                window.location.reload();
+            }
+            
+            // 绑定同步按钮点击事件
+            const syncBtn = document.getElementById('syncTablesBtn');
+            syncBtn.addEventListener('click', syncTables);
+        });
+</script>
+</body>
+</html>
