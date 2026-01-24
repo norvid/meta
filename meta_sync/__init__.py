@@ -14,14 +14,16 @@ def test_database_connection(db_type, db_host, db_port, db_name, db_user, db_pas
             return {'success': False, 'message': '连接失败：缺少必要的连接参数'}
         
         # 根据数据库类型创建连接字符串
+        import urllib.parse
+        encoded_password = urllib.parse.quote_plus(db_password)
         if db_type == 'MySQL':
-            connection_string = f'mysql+pymysql://{db_user}:{db_password}@{db_host}:{db_port}/{db_name}'
+            connection_string = f'mysql+pymysql://{db_user}:{encoded_password}@{db_host}:{db_port}/{db_name}'
         elif db_type == 'PostgreSQL':
-            connection_string = f'postgresql://{db_user}:{db_password}@{db_host}:{db_port}/{db_name}'
+            connection_string = f'postgresql://{db_user}:{encoded_password}@{db_host}:{db_port}/{db_name}'
         elif db_type == 'Hive':
-            connection_string = f'hive://{db_user}:{db_password}@{db_host}:{db_port}/{db_name}'
+            connection_string = f'hive://{db_user}:{encoded_password}@{db_host}:{db_port}/{db_name}'
         elif db_type == 'SqlServer':
-            connection_string = f'mssql+pyodbc://{db_user}:{db_password}@{db_host}:{db_port}/{db_name}?driver=ODBC+Driver+17+for+SQL+Server'
+            connection_string = f'mssql+pyodbc://{db_user}:{encoded_password}@{db_host}:{db_port}/{db_name}?driver=ODBC+Driver+17+for+SQL+Server'
         else:
             return {'success': False, 'message': f'连接失败：不支持的数据库类型 {db_type}'}
         
