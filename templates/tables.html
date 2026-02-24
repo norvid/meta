@@ -55,7 +55,7 @@
                         <strong>别名：</strong>{{ database.db_alias }}
                     </div>
                     <div class="col-12 mt-2">
-                        <strong>备注：</strong>{{ database.remark or '无' }}
+                        <strong>备注：</strong>{{ (database.remark or '无').replace('\n', '<br>')|safe }}
                     </div>
                 </div>
             </div>

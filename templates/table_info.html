@@ -75,10 +75,10 @@
                         <strong>表名：</strong> {{ table.table_name }}
                     </div>
                     <div class="col-md-6">
-                        <strong>注释：</strong> {{ table.table_comment or '无' }}
+                        <strong>注释：</strong> {{ (table.table_comment or '无').replace('\n', '<br>')|safe }}
                     </div>
                     <div class="col-12 mt-2">
-                        <strong>备注：</strong> <span id="remarkText">{{ table.remark or '无' }}</span>
+                        <strong>备注：</strong> <span id="remarkText">{{ (table.remark or '无').replace('\n', '<br>')|safe }}</span>
                         <!-- 编辑模式下的输入框 -->
                         <div id="remarkEdit" style="display: none; margin-top: 10px;">
                             <textarea class="form-control" id="remarkTextarea" rows="3" placeholder="请输入备注信息">{{ table.remark or '' }}</textarea>
@@ -127,7 +127,7 @@
                                     {% else %}
                                     -{% endif %}
                                 </td>
-                                <td>{{ column.column_comment or '无' }}</td>
+                                <td>{{ (column.column_comment or '无').replace('\n', '<br>')|safe }}</td>
                             </tr>
                             {% endfor %}
                         </tbody>
@@ -192,8 +192,8 @@
             
             xhr.onreadystatechange = function() {
                 if (xhr.readyState === 4 && xhr.status === 200) {
-                    // 更新显示
-                    remarkText.textContent = newRemark || '无';
+                    // 更新显示，将回车符转换为<br>标签
+                    remarkText.innerHTML = (newRemark || '无').replace(/\n/g, '<br>');
                     remarkText.style.display = 'inline';
                     remarkEdit.style.display = 'none';
                     editRemarkBtn.disabled = false;
