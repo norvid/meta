@@ -2,7 +2,7 @@ from flask import Flask, render_template, jsonify, request, redirect, url_for
 from datetime import datetime
 
 # 导入数据库模型和初始化函数
-from models import db, Database, Table, Column
+from models import db, Database, Table, Column, Tag, TableTag
 import db_util
 
 # 载入配置文件
@@ -172,45 +172,45 @@ def test_database_connection():
 
 @app.route('/database/<int:db_id>/tables')
 def database_tables(db_id):
-    # 获取数据库
     database = Database.query.get_or_404(db_id)
-    # 移除密码信息
     database.db_password = ''
     
-    # 获取分页参数和搜索关键字
     page = request.args.get('page', 1, type=int)
     keyword = request.args.get('keyword', '')
+    tag_id = request.args.get('tag_id', type=int)
     per_page = 20
     
-    # 构建查询
     query = Table.query.filter_by(db_id=db_id)
     
-    # 如果有搜索关键字，添加搜索条件
     if keyword:
         query = query.filter(
             (Table.table_name.ilike(f'%{keyword}%')) | 
-            (Table.schema_name == keyword) |  # 模式名使用完全匹配查询
+            (Table.schema_name == keyword) |
             (Table.table_comment.ilike(f'%{keyword}%'))
         )
     
-    # 分页获取表列表，按表名升序排序
+    if tag_id:
+        table_ids_subquery = db.session.query(TableTag.table_id).filter(TableTag.tag_id == tag_id).subquery()
+        query = query.filter(Table.id.in_(table_ids_subquery))
+    
     tables = query.order_by(Table.table_name.asc()).paginate(page=page, per_page=per_page, error_out=False)
     
-    return render_template('tables.html', database=database, tables=tables, keyword=keyword)
+    all_tags = Tag.query.order_by(Tag.tag_name.asc()).all()
+    
+    return render_template('tables.html', database=database, tables=tables, keyword=keyword, tag_id=tag_id, all_tags=all_tags)
 
 
 @app.route('/database/<int:db_id>/table/<string:schema_name>/<string:table_name>/info')
 def table_info(db_id, schema_name, table_name):
-    # 获取数据库和表
     database = Database.query.get_or_404(db_id)
-    # 移除密码信息
     database.db_password = ''
     table = Table.query.filter_by(db_id=db_id, schema_name=schema_name, table_name=table_name).first_or_404()
     
-    # 获取表的字段
     columns = Column.query.filter_by(table_id=table.id).order_by(Column.ordinal_position).all()
     
-    return render_template('table_info.html', database=database, table=table, columns=columns)
+    table_tags = db.session.query(Tag).join(TableTag).filter(TableTag.table_id == table.id).all()
+    
+    return render_template('table_info.html', database=database, table=table, columns=columns, table_tags=table_tags)
 
 # 更新表备注路由
 @app.route('/database/<int:db_id>/table/<int:table_id>/update-remark', methods=['POST'])
@@ -374,6 +374,156 @@ def sync_status(db_id):
         else:
             # token不一致或没有，仅返回状态
             return jsonify({'status': task['status']})
+
+
+# ===================== 标签管理路由 =====================
+
+@app.route('/tags')
+def tags():
+    page = request.args.get('page', 1, type=int)
+    per_page = 10
+    
+    tag_counts = db.session.query(
+        Tag.id,
+        Tag.tag_name,
+        Tag.description,
+        Tag.created_at,
+        db.func.count(TableTag.id).label('table_count')
+    ).outerjoin(TableTag, Tag.id == TableTag.tag_id)\
+     .group_by(Tag.id)\
+     .order_by(db.desc('table_count'), Tag.tag_name.asc())\
+     .paginate(page=page, per_page=per_page, error_out=False)
+    
+    max_count = 0
+    for tag in tag_counts.items:
+        if tag.table_count > max_count:
+            max_count = tag.table_count
+    
+    return render_template('tags.html', tags=tag_counts, max_count=max_count)
+
+@app.route('/tags/add', methods=['POST'])
+def add_tag():
+    tag_name = request.form.get('tag_name', '').strip()
+    description = request.form.get('description', '').strip()
+    
+    if not tag_name:
+        return jsonify({'success': False, 'message': '标签名称不能为空'})
+    
+    existing = Tag.query.filter_by(tag_name=tag_name).first()
+    if existing:
+        return jsonify({'success': False, 'message': '标签名称已存在'})
+    
+    new_tag = Tag(tag_name=tag_name, description=description)
+    db.session.add(new_tag)
+    db.session.commit()
+    
+    return jsonify({'success': True, 'message': '标签创建成功', 'tag_id': new_tag.id})
+
+@app.route('/tags/edit', methods=['POST'])
+def edit_tag():
+    tag_id = request.form.get('id', type=int)
+    tag_name = request.form.get('tag_name', '').strip()
+    description = request.form.get('description', '').strip()
+    
+    if not tag_id or not tag_name:
+        return jsonify({'success': False, 'message': '参数错误'})
+    
+    tag = Tag.query.get_or_404(tag_id)
+    
+    existing = Tag.query.filter(Tag.tag_name == tag_name, Tag.id != tag_id).first()
+    if existing:
+        return jsonify({'success': False, 'message': '标签名称已存在'})
+    
+    tag.tag_name = tag_name
+    tag.description = description
+    db.session.commit()
+    
+    return jsonify({'success': True, 'message': '标签更新成功'})
+
+@app.route('/tags/delete', methods=['POST'])
+def delete_tag():
+    tag_id = request.form.get('id', type=int)
+    
+    if not tag_id:
+        return jsonify({'success': False, 'message': '参数错误'})
+    
+    tag = Tag.query.get_or_404(tag_id)
+    
+    TableTag.query.filter_by(tag_id=tag_id).delete()
+    
+    db.session.delete(tag)
+    db.session.commit()
+    
+    return jsonify({'success': True, 'message': '标签删除成功'})
+
+@app.route('/tags/<int:tag_id>')
+def tag_detail(tag_id):
+    tag = Tag.query.get_or_404(tag_id)
+    page = request.args.get('page', 1, type=int)
+    per_page = 20
+    
+    table_ids = [tt.table_id for tt in TableTag.query.filter_by(tag_id=tag_id).all()]
+    
+    tables_pagination = None
+    if table_ids:
+        tables_pagination = Table.query.filter(Table.id.in_(table_ids)).order_by(Table.table_name.asc()).paginate(page=page, per_page=per_page, error_out=False)
+    
+    db_cache = {}
+    for db_record in Database.query.all():
+        db_cache[db_record.id] = db_record
+    
+    return render_template('tag_detail.html', tag=tag, tables=tables_pagination, db_cache=db_cache)
+
+@app.route('/api/tags')
+def api_tags():
+    all_tags = Tag.query.order_by(Tag.tag_name.asc()).all()
+    tags_list = [{'id': t.id, 'tag_name': t.tag_name, 'description': t.description or ''} for t in all_tags]
+    return jsonify({'success': True, 'tags': tags_list})
+
+@app.route('/table/<int:table_id>/tags/add', methods=['POST'])
+def add_table_tag(table_id):
+    table = Table.query.get_or_404(table_id)
+    tag_id = request.form.get('tag_id', type=int)
+    tag_name = request.form.get('tag_name', '').strip()
+    
+    if tag_id:
+        tag = Tag.query.get(tag_id)
+        if not tag:
+            return jsonify({'success': False, 'message': '标签不存在'})
+    elif tag_name:
+        tag = Tag.query.filter_by(tag_name=tag_name).first()
+        if not tag:
+            tag = Tag(tag_name=tag_name)
+            db.session.add(tag)
+            db.session.flush()
+    else:
+        return jsonify({'success': False, 'message': '请选择或输入标签'})
+    
+    existing = TableTag.query.filter_by(table_id=table_id, tag_id=tag.id).first()
+    if existing:
+        return jsonify({'success': False, 'message': '该表已存在此标签'})
+    
+    table_tag = TableTag(table_id=table_id, tag_id=tag.id)
+    db.session.add(table_tag)
+    db.session.commit()
+    
+    return jsonify({'success': True, 'message': '标签添加成功', 'tag_id': tag.id, 'tag_name': tag.tag_name})
+
+@app.route('/table/<int:table_id>/tags/remove', methods=['POST'])
+def remove_table_tag(table_id):
+    tag_id = request.form.get('tag_id', type=int)
+    
+    if not tag_id:
+        return jsonify({'success': False, 'message': '参数错误'})
+    
+    table_tag = TableTag.query.filter_by(table_id=table_id, tag_id=tag_id).first()
+    if not table_tag:
+        return jsonify({'success': False, 'message': '标签关联不存在'})
+    
+    db.session.delete(table_tag)
+    db.session.commit()
+    
+    return jsonify({'success': True, 'message': '标签移除成功'})
 
 
 

@@ -73,6 +73,12 @@
                 <div class="mb-4">
                     <div class="d-flex align-items-center">
                         <input type="text" class="form-control me-2" placeholder="输入表名、模式或注释关键字" id="searchInput" name="keyword" value="{{ keyword }}" style="width: 50%;">
+                        <select class="form-select me-2" id="tagFilter" style="width: 150px;">
+                            <option value="">全部标签</option>
+                            {% for tag in all_tags %}
+                            <option value="{{ tag.id }}" {% if tag_id == tag.id %}selected{% endif %}>{{ tag.tag_name }}</option>
+                            {% endfor %}
+                        </select>
                         <button type="button" class="btn btn-primary" id="searchBtn" style="min-width: 100px;">
                             <i class="bi bi-search"></i> 查询
                         </button>
@@ -86,9 +92,10 @@
                     <table class="table table-striped table-hover">
                         <thead class="table-dark">
                             <tr>
-                                <th style="width: 20%;">模式</th>
-                                <th style="width: 30%;">表名</th>
-                                <th style="width: 30%;">表注释</th>
+                                <th style="width: 15%;">模式</th>
+                                <th style="width: 20%;">表名</th>
+                                <th style="width: 25%;">表注释</th>
+                                <th style="width: 20%;">标签</th>
                                 <th style="width: 20%;">创建时间</th>
                             </tr>
                         </thead>
@@ -102,6 +109,16 @@
                                     </a>
                                 </td>
                                 <td>{{ table.table_comment or '无' }}</td>
+                                <td>
+                                    {% set table_tags = table.tags.all() %}
+                                    {% if table_tags %}
+                                        {% for tag in table_tags %}
+                                        <a href="/tags/{{ tag.id }}" class="text-decoration-none">{{ tag.tag_name }}</a>{% if not loop.last %}, {% endif %}
+                                        {% endfor %}
+                                    {% else %}
+                                        <span class="text-muted">无</span>
+                                    {% endif %}
+                                </td>
                                 <td>{{ table.create_time.strftime('%Y-%m-%d %H:%M:%S') if table.create_time else '未知' }}</td>
                             </tr>
                             {% endfor %}
@@ -348,41 +365,40 @@
             const searchInput = document.getElementById('searchInput');
             const searchBtn = document.getElementById('searchBtn');
             const resetBtn = document.getElementById('resetBtn');
+            const tagFilter = document.getElementById('tagFilter');
             const loading = document.getElementById('loading');
             const tbody = document.querySelector('.table tbody');
             
-            function performSearch(keyword) {
+            function performSearch(keyword, tagId) {
                 loading.style.display = 'inline';
                 
-                // 强制收起基本信息卡片
                 infoBody.style.display = 'none';
                 toggleIcon.classList.remove('bi-chevron-up');
                 toggleIcon.classList.add('bi-chevron-down');
                 
-                // 发送AJAX请求
+                let url = `/database/{{ database.id }}/tables?keyword=${encodeURIComponent(keyword)}&page=1`;
+                if (tagId) {
+                    url += `&tag_id=${tagId}`;
+                }
+                
                 var xhr = new XMLHttpRequest();
-                xhr.open('GET', `/database/{{ database.id }}/tables?keyword=${encodeURIComponent(keyword)}&page=1`, true);
+                xhr.open('GET', url, true);
                 
                 xhr.onreadystatechange = function() {
                     if (xhr.readyState === 4) {
-                        // 无论成功还是失败，都隐藏loading
                         loading.style.display = 'none';
                         
                         if (xhr.status === 200) {
-                            // 解析HTML响应
                             const parser = new DOMParser();
                             const doc = parser.parseFromString(xhr.responseText, 'text/html');
                             
-                            // 更新表格内容
                             const newTbody = doc.querySelector('.table tbody');
                             tbody.innerHTML = newTbody.innerHTML;
                             
-                            // 更新分页信息
                             const newPagination = doc.querySelector('.pagination');
                             const oldPagination = document.querySelector('.pagination');
                             oldPagination.innerHTML = newPagination.innerHTML;
                             
-                            // 更新总数信息
                             const newTotal = doc.getElementById('recordTotal');
                             const oldTotal = document.getElementById('recordTotal');
                             oldTotal.innerHTML = newTotal.innerHTML;
@@ -396,20 +412,30 @@
             // 搜索按钮点击事件
             searchBtn.addEventListener('click', function() {
                 const keyword = searchInput.value;
-                performSearch(keyword);
+                const tagId = tagFilter.value;
+                performSearch(keyword, tagId);
             });
             
             // 重置按钮点击事件
             resetBtn.addEventListener('click', function() {
                 searchInput.value = '';
-                performSearch('');
+                tagFilter.value = '';
+                performSearch('', '');
+            });
+            
+            // 标签筛选变化事件
+            tagFilter.addEventListener('change', function() {
+                const keyword = searchInput.value;
+                const tagId = tagFilter.value;
+                performSearch(keyword, tagId);
             });
             
             // 回车键搜索
             searchInput.addEventListener('keypress', function(e) {
                 if (e.key === 'Enter') {
                     const keyword = searchInput.value;
-                    performSearch(keyword);
+                    const tagId = tagFilter.value;
+                    performSearch(keyword, tagId);
                 }
             });
             

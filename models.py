@@ -30,8 +30,8 @@ class Table(db.Model):
     create_time = db.Column(db.DateTime)
     update_time = db.Column(db.DateTime)
     
-    # 关系
     columns = db.relationship('Column', backref='table', lazy=True)
+    tags = db.relationship('Tag', secondary='tb_table_tag', backref='tables', lazy='dynamic')
 
 class Column(db.Model):
     __tablename__ = 'tb_column'
@@ -43,4 +43,21 @@ class Column(db.Model):
     is_unique = db.Column(db.Boolean, default=False)
     column_comment = db.Column(db.String(255))
     ordinal_position = db.Column(db.Integer)
+
+class Tag(db.Model):
+    __tablename__ = 'tb_tag'
+    id = db.Column(db.Integer, primary_key=True)
+    tag_name = db.Column(db.String(50), nullable=False, unique=True)
+    description = db.Column(db.String(500))
+    created_at = db.Column(db.DateTime, default=datetime.now)
+    updated_at = db.Column(db.DateTime, default=datetime.now, onupdate=datetime.now)
+
+class TableTag(db.Model):
+    __tablename__ = 'tb_table_tag'
+    id = db.Column(db.Integer, primary_key=True)
+    table_id = db.Column(db.Integer, db.ForeignKey('tb_table.id'), nullable=False)
+    tag_id = db.Column(db.Integer, db.ForeignKey('tb_tag.id'), nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.now)
+    
+    __table_args__ = (db.UniqueConstraint('table_id', 'tag_id'),)
 

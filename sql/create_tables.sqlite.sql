@@ -38,6 +38,24 @@ CREATE TABLE if not exists `tb_column` (
   `ordinal_position` INTEGER DEFAULT NULL
 );
 
+-- 创建tb_tag表
+CREATE TABLE if not exists `tb_tag` (
+  `id` INTEGER PRIMARY KEY AUTOINCREMENT,
+  `tag_name` TEXT NOT NULL UNIQUE,
+  `description` TEXT DEFAULT NULL,
+  `created_at` TEXT DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` TEXT DEFAULT CURRENT_TIMESTAMP
+);
+
+-- 创建tb_table_tag表
+CREATE TABLE if not exists `tb_table_tag` (
+  `id` INTEGER PRIMARY KEY AUTOINCREMENT,
+  `table_id` INTEGER NOT NULL,
+  `tag_id` INTEGER NOT NULL,
+  `created_at` TEXT DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE (`table_id`, `tag_id`)
+);
+
 
 -- 插入测试数据
 INSERT INTO `tb_database` (`db_type`, `db_alias`, `db_host`, `db_port`, `db_name`, `db_user`, `db_password`) VALUES
