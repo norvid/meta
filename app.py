@@ -474,11 +474,53 @@ def tag_detail(tag_id):
     
     return render_template('tag_detail.html', tag=tag, tables=tables_pagination, db_cache=db_cache)
 
+@app.route('/tags/name/<tag_name>')
+def tag_detail_by_name(tag_name):
+    tag = Tag.query.filter_by(tag_name=tag_name).first()
+    
+    if not tag:
+        return render_template('tag_not_found.html', tag_name=tag_name)
+    
+    page = request.args.get('page', 1, type=int)
+    per_page = 20
+    
+    table_ids = [tt.table_id for tt in TableTag.query.filter_by(tag_id=tag.id).all()]
+    
+    tables_pagination = None
+    if table_ids:
+        tables_pagination = Table.query.filter(Table.id.in_(table_ids)).order_by(Table.table_name.asc()).paginate(page=page, per_page=per_page, error_out=False)
+    
+    db_cache = {}
+    for db_record in Database.query.all():
+        db_cache[db_record.id] = db_record
+    
+    return render_template('tag_detail.html', tag=tag, tables=tables_pagination, db_cache=db_cache)
+
 @app.route('/api/tags')
 def api_tags():
     all_tags = Tag.query.order_by(Tag.tag_name.asc()).all()
     tags_list = [{'id': t.id, 'tag_name': t.tag_name, 'description': t.description or ''} for t in all_tags]
     return jsonify({'success': True, 'tags': tags_list})
+
+@app.route('/api/tags/info')
+def api_tags_info():
+    tag_names = request.args.getlist('tag_names')
+    if not tag_names:
+        return jsonify({'success': False, 'message': '请提供标签名称列表'})
+    
+    tags_info = {}
+    for tag_name in tag_names:
+        tag = Tag.query.filter_by(tag_name=tag_name).first()
+        if tag:
+            tags_info[tag_name] = {
+                'id': tag.id,
+                'tag_name': tag.tag_name,
+                'description': tag.description or ''
+            }
+        else:
+            tags_info[tag_name] = None
+    
+    return jsonify({'success': True, 'tags': tags_info})
 
 @app.route('/table/<int:table_id>/tags/add', methods=['POST'])
 def add_table_tag(table_id):

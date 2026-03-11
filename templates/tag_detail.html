@@ -46,7 +46,7 @@
                     </div>
                     <div class="col-12 mt-2">
                         <strong>描述：</strong> 
-                        <span id="descText">{{ (tag.description or '无').replace('\n', '<br>')|safe }}</span>
+                        <span id="descText" data-description="{{ tag.description or '' }}">{{ (tag.description or '无').replace('\n', '<br>')|safe }}</span>
                         <div id="descEdit" style="display: none; margin-top: 10px;">
                             <textarea class="form-control" id="descTextarea" rows="3" placeholder="请输入标签描述" maxlength="500">{{ tag.description or '' }}</textarea>
                             <div class="d-flex justify-content-end mt-2">
@@ -181,6 +181,78 @@
     
 <script src="/static/js/bootstrap.bundle.min.js"></script>
     <script>
+        let tagsInfoCache = {};
+        
+        function parseMetricLinks(text) {
+            const regex = /\[([^\]]+)\]/g;
+            const tagNames = [];
+            const result = text.replace(regex, (match, tagName) => {
+                tagNames.push(tagName);
+                return `<a href="/tags/name/${encodeURIComponent(tagName)}" class="metric-link" data-tag-name="${encodeURIComponent(tagName)}">${tagName}</a>`;
+            });
+            return { html: result, tagNames: tagNames };
+        }
+        
+        async function loadTagsInfo(tagNames) {
+            if (tagNames.length === 0) return;
+            
+            const uniqueTagNames = [...new Set(tagNames)].filter(name => !tagsInfoCache[name]);
+            if (uniqueTagNames.length === 0) {
+                applyTooltips();
+                return;
+            }
+            
+            const params = uniqueTagNames.map(name => `tag_names=${encodeURIComponent(name)}`).join('&');
+            try {
+                const response = await fetch(`/api/tags/info?${params}`);
+                const data = await response.json();
+                if (data.success) {
+                    Object.assign(tagsInfoCache, data.tags);
+                    applyTooltips();
+                }
+            } catch (error) {
+                console.error('加载标签信息失败:', error);
+            }
+        }
+        
+        function applyTooltips() {
+            const metricLinks = document.querySelectorAll('.metric-link');
+            metricLinks.forEach(link => {
+                const tagName = decodeURIComponent(link.getAttribute('data-tag-name'));
+                const tagInfo = tagsInfoCache[tagName];
+                
+                if (tagInfo && tagInfo.description) {
+                    link.setAttribute('data-bs-toggle', 'tooltip');
+                    link.setAttribute('data-bs-placement', 'top');
+                    link.setAttribute('data-bs-html', 'true');
+                    link.setAttribute('title', `<strong>${tagInfo.tag_name}</strong><br>${tagInfo.description.replace(/\n/g, '<br>')}`);
+                    link.style.cursor = 'help';
+                    link.style.borderBottom = '1px dashed #007bff';
+                } else if (tagInfo === null) {
+                    link.setAttribute('data-bs-toggle', 'tooltip');
+                    link.setAttribute('data-bs-placement', 'top');
+                    link.setAttribute('title', '标签不存在，点击可创建');
+                    link.style.cursor = 'help';
+                    link.style.borderBottom = '1px dashed #6c757d';
+                }
+            });
+            
+            const tooltipTriggerList = document.querySelectorAll('[data-bs-toggle="tooltip"]');
+            tooltipTriggerList.forEach(tooltipTriggerEl => {
+                new bootstrap.Tooltip(tooltipTriggerEl);
+            });
+        }
+        
+        function applyMetricLinks() {
+            const descText = document.getElementById('descText');
+            const description = descText.getAttribute('data-description');
+            if (description && description.trim() !== '') {
+                const result = parseMetricLinks(description.replace(/\n/g, '<br>'));
+                descText.innerHTML = result.html;
+                loadTagsInfo(result.tagNames);
+            }
+        }
+        
         const editDescBtn = document.getElementById('editDescBtn');
         const descText = document.getElementById('descText');
         const descEdit = document.getElementById('descEdit');
@@ -215,7 +287,11 @@
             .then(response => response.json())
             .then(data => {
                 if (data.success) {
-                    descText.innerHTML = (newDesc || '无').replace(/\n/g, '<br>');
+                    descText.setAttribute('data-description', newDesc);
+                    const result = parseMetricLinks(newDesc || '无');
+                    descText.innerHTML = result.html.replace(/\n/g, '<br>');
+                    tagsInfoCache = {};
+                    loadTagsInfo(result.tagNames);
                     descText.style.display = 'inline';
                     descEdit.style.display = 'none';
                     editDescBtn.disabled = false;
@@ -223,6 +299,10 @@
                     alert(data.message);
                 }
             });
+        });
+        
+        document.addEventListener('DOMContentLoaded', function() {
+            applyMetricLinks();
         });
     </script>
 </body>
