@@ -41,6 +41,7 @@ class Column(db.Model):
     column_type = db.Column(db.String(100), nullable=False)
     is_primary = db.Column(db.Boolean, default=False)
     is_unique = db.Column(db.Boolean, default=False)
+    is_partition = db.Column(db.Boolean, default=False)
     column_comment = db.Column(db.String(255))
     ordinal_position = db.Column(db.Integer)
 
