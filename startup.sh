@@ -1,7 +1,7 @@
 #!/bin/bash
 
 current_date=$(date +%Y%m%d)
-log_file="meta-app-${current_date}.log"
+log_file="app-${current_date}.log"
 
 if [ ! -f "${log_file}" ]; then
     touch "${log_file}"

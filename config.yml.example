@@ -4,6 +4,14 @@ app:
   port: 46382
   debug: true
 
+# OBS 配置
+obs:
+  ak: 'your_access_key'
+  sk: 'your_secret_key'
+  server: 'obs.cn-sound-1.myhuaweicloud.com'
+  bucket: 'your_bucket_name'
+  root_path: 'cwdz/files/'
+
 # 数据库配置
 # 以下是不同数据库类型的配置示例，取消注释并修改对应的值
 

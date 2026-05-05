@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OBS 文件浏览 - 元数据管理</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📁</text></svg>">
+    <link href="/static/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="/static/css/bootstrap-icons.min.css">
+</head>
+<body>
+    <div class="container mt-1">
+        {% include 'components/banner.html' %}
+        
+        <div class="d-flex justify-content-between align-items-center mb-2">
+            <h1 class="mb-0 mt-0" style="margin: 5px 0;">
+                <span class="badge bg-info" style="font-size: 1.2rem;">OBS 文件浏览</span>
+            </h1>
+        </div>
+        
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">
+                    当前路径: {{ root_path }}{{ current_path if current_path else '' }}
+                </h5>
+            </div>
+            <div class="card-body">
+                {% if parent_path or current_path!=parent_path %}
+                <div class="mb-3">
+                    <a href="/obs?path={{ parent_path }}" class="btn btn-outline-secondary">
+                        <i class="bi bi-arrow-up"></i> 返回上级目录
+                    </a>
+                </div>
+                {% endif %}
+                
+                {% if folders or files %}
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead class="table-light">
+                            <tr>
+                                <th style="width: 50%;">名称</th>
+                                <th style="width: 30%;">类型</th>
+                                <th style="width: 20%;">大小</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for folder in folders %}
+                            <tr style="cursor: pointer;" onclick="window.location.href='/obs?path={{ folder.path }}'">
+                                <td>
+                                    <i class="bi bi-folder-fill text-warning me-2"></i>
+                                    <a href="/obs?path={{ folder.path }}" class="text-decoration-none">{{ folder.name }}</a>
+                                </td>
+                                <td>文件夹</td>
+                                <td>-</td>
+                            </tr>
+                            {% endfor %}
+                            
+                            {% for file in files %}
+                            <tr style="cursor: pointer;" onclick="downloadFile('{{ file.key }}', '{{ file.name }}')">
+                                <td>
+                                    <i class="bi bi-file-earmark-fill text-primary me-2"></i>
+                                    <a href="javascript:void(0)" class="text-decoration-none" onclick="event.stopPropagation(); downloadFile('{{ file.key }}', '{{ file.name }}')">{{ file.name }}</a>
+                                </td>
+                                <td>文件</td>
+                                <td>{{ file.size | filesizeformat }}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                <div class="text-center text-muted py-5">
+                    <i class="bi bi-folder2-open" style="font-size: 3rem;"></i>
+                    <p class="mt-2">目录为空</p>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    
+    <script src="/static/js/bootstrap.bundle.min.js"></script>
+    <script>
+        function downloadFile(fileKey, fileName) {
+            fetch('/obs/download?key=' + encodeURIComponent(fileKey))
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        const link = document.createElement('a');
+                        link.href = data.url;
+                        link.download = fileName;
+                        document.body.appendChild(link);
+                        link.click();
+                        document.body.removeChild(link);
+                    } else {
+                        alert('下载失败：' + data.message);
+                    }
+                })
+                .catch(error => {
+                    alert('下载请求失败：' + error);
+                });
+        }
+    </script>
+</body>
+</html>

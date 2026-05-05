@@ -12,6 +12,10 @@ config = db_util.load_config()
 app = Flask(__name__)
 db_util.init_db(app, config, db)
 
+# 注册 OBS 蓝图
+from obs_module import obs_bp
+app.register_blueprint(obs_bp)
+
 # 全局同步任务map，用于存储同步状态
 import threading
 sync_tasks = {}
@@ -40,7 +44,7 @@ def databases():
     # 移除密码信息
     for db in databases:
         db.db_password = ''
-    return render_template('databases.html', databases=databases)
+    return render_template('databases.html', databases=databases, active_page='databases')
 
 # 新增数据库路由
 @app.route('/databases/add', methods=['POST'])
@@ -399,7 +403,7 @@ def tags():
         if tag.table_count > max_count:
             max_count = tag.table_count
     
-    return render_template('tags.html', tags=tag_counts, max_count=max_count)
+    return render_template('tags.html', tags=tag_counts, max_count=max_count, active_page='tags')
 
 @app.route('/tags/add', methods=['POST'])
 def add_tag():
@@ -568,9 +572,7 @@ def remove_table_tag(table_id):
     return jsonify({'success': True, 'message': '标签移除成功'})
 
 
-
-
-
+# ===================== OBS 文件浏览路由 =====================
 
 
 import sys
